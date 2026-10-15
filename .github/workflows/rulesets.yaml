@@ -10,6 +10,7 @@ on:
 permissions:
   repository-projects: write
   contents: read
+  administration: write
 
 jobs:
   sync-ruleset:
