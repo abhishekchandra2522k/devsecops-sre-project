@@ -8,6 +8,7 @@ on:
       - '.github/rulesets/**'
 
 permissions:
+  repository-projects: write
   contents: read
 
 jobs:
@@ -21,41 +22,16 @@ jobs:
       - name: Apply or Update Ruleset
         env:
           GH_TOKEN: ${{ secrets.RULESET_TOKEN }}
-          REPOSITORY: ${{ github.repository }}
-          RULESET_FILE: .github/rulesets/main-protection.json
-        shell: bash
         run: |
-          set -euo pipefail
+          EXISTING_RULESET_ID=$(gh api repos/${{ github.repository }}/rulesets \
+            --jq '.[] | select(.name == "Protect Main Branch") | .id')
 
-          # Fail early if the ruleset configuration is missing.
-          test -f "$RULESET_FILE"
-
-          # Validate that the configuration is valid JSON.
-          jq empty "$RULESET_FILE"
-
-          # Find an existing ruleset by exact name, across all pages.
-          EXISTING_RULESET_ID=$(
-            gh api --paginate --slurp \
-              "repos/$REPOSITORY/rulesets?per_page=100" \
-              | jq -r \
-                '[.[][] | select(.name == "Protect Main Branch") | .id]
-                 | first // empty'
-          )
-
-          if [[ -z "$EXISTING_RULESET_ID" ]]; then
-            echo "Ruleset not found. Creating it..."
-
-            gh api \
-              --method POST \
-              "repos/$REPOSITORY/rulesets" \
-              --input "$RULESET_FILE"
+          if [ -z "$EXISTING_RULESET_ID" ]; then
+            echo "Ruleset does not exist. Creating a new one..."
+            gh api -X POST repos/${{ github.repository }}/rulesets \
+              --input .github/rulesets/main-protection.json
           else
-            echo "Updating ruleset ID: $EXISTING_RULESET_ID"
-
-            gh api \
-              --method PUT \
-              "repos/$REPOSITORY/rulesets/$EXISTING_RULESET_ID" \
-              --input "$RULESET_FILE"
+            echo "Ruleset already exists with ID: $EXISTING_RULESET_ID. Updating..."
+            gh api -X PUT repos/${{ github.repository }}/rulesets/$EXISTING_RULESET_ID \
+              --input .github/rulesets/main-protection.json
           fi
-
-          echo "Ruleset synchronization completed successfully."
