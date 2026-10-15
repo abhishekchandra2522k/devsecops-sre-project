@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/rulesets/**'
 
+  workflow_dispatch:
+
 permissions:
   repository-projects: write
   contents: read
