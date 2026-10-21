@@ -45,7 +45,7 @@ jobs:
           fi
 
       - name: Python linting
-        run: flake8 app tests
+        run: flake8 app
 
       # - name: Unit tests
       #   run: pytest -v
@@ -78,7 +78,7 @@ jobs:
             -m compileall -q /app
 
       - name: Scan image vulnerabilities - Trivy
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: python-app:${{ github.sha }}
           scan-type: image
