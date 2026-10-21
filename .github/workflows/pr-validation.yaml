@@ -75,7 +75,7 @@ jobs:
           docker run --rm \
             --entrypoint python \
             python-app:${{ github.sha }} \
-            -m compileall -q /app
+            -B -m compileall -q /app
 
       - name: Scan image vulnerabilities - Trivy
         uses: aquasecurity/trivy-action@v0.36.0
