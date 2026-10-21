@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: pr-quality-${{ github.event.pull_request.number }}
@@ -54,7 +55,10 @@ jobs:
         run: bandit -r app -s B104 -ll
 
       - name: Secret scanning - Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: 'true'
 
   build-image:
     name: Build Container
