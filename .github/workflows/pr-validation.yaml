@@ -1,0 +1,89 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-quality-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  quality-check:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install dependencies and quality tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            pytest==8.4.2 \
+            flake8==7.3.0 \
+            bandit==1.8.6
+
+          # Install application dependencies if present.
+          if [ -f requirements.txt ]; then
+            python -m pip install -r requirements.txt
+          fi
+
+      - name: Python linting
+        run: flake8 app tests
+
+      # - name: Unit tests
+      #   run: pytest -v
+
+      - name: SAST - Bandit
+        run: bandit -r app -s B104 -ll
+
+      - name: Secret scanning - Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+
+  build-image:
+    name: Build Container
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag python-app:${{ github.sha }} \
+            .
+
+      - name: Smoke test image
+        run: |
+          docker run --rm \
+            --entrypoint python \
+            python-app:${{ github.sha }} \
+            -m compileall -q /app
+
+      - name: Scan image vulnerabilities - Trivy
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: python-app:${{ github.sha }}
+          scan-type: image
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
