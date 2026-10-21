@@ -47,8 +47,8 @@ jobs:
       - name: Python linting
         run: flake8 app
 
-      # - name: Unit tests
-      #   run: pytest -v
+      - name: Unit tests
+        run: pytest -v
 
       - name: SAST - Bandit
         run: bandit -r app -s B104 -ll

@@ -18,6 +18,12 @@ RUN groupadd --system --gid 10001 admins \
 
 COPY --chown=10001:10001 app/app.py ./app.py
 
+RUN python -m compileall -q /app
+
 USER app-admin:admins
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthcheck', timeout=2)"]
+
 
 ENTRYPOINT ["python", "-u", "./app.py"]
