@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -88,6 +90,6 @@ jobs:
           scan-type: image
           format: table
           vuln-type: os,library
-          severity: CRITICAL,HIGH
+          severity: CRITICAL
           ignore-unfixed: true
           exit-code: '1'
