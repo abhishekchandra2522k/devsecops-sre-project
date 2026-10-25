@@ -1,0 +1,91 @@
+name: Release Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'k8s/**'
+      - '**.md'
+
+  workflow_dispatch:
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  MANIFEST_PATH: k8s/deployment.yaml
+
+jobs:
+  build-and-push:
+    name: Build and push image
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out image tag
+        id: vars
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  update-manifest:
+    name: Update image tag in k8s manifests
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # main is protected, so a plain GITHUB_TOKEN push will be rejected.
+          # Use a token (PAT or GitHub App) belonging to an actor that is
+          # allowed to bypass the branch protection rule.
+          token: ${{ secrets.RULESET_TOKEN }}
+
+      - name: Point the manifest at the new image
+        run: |
+          NEW_IMAGE="${REGISTRY}/${IMAGE_NAME}:${{ needs.build-and-push.outputs.tag }}"
+          sed -i -E "s|image: ${REGISTRY}/${IMAGE_NAME}:.*|image: ${NEW_IMAGE}|" "${MANIFEST_PATH}"
+          echo "Updated to ${NEW_IMAGE}"
+          git diff --stat
+
+      - name: Commit and push
+        run: |
+          if git diff --quiet; then
+            echo "Manifest already up to date, nothing to commit."
+            exit 0
+          fi
+          git config user.name "release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git add "${MANIFEST_PATH}"
+          git commit -m "chore: bump image to ${{ needs.build-and-push.outputs.tag }} [skip ci]"
+          git push origin main

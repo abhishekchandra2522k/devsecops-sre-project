@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  labels:
+    app: myapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+        - name: python-app
+          image: ghcr.io/abhishekchandra2522k/devsecops-sre-project:latest
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '64Mi'
+            limits:
+              memory: '400Mi'
+              cpu: '500m'
+          ports:
+            - containerPort: 80
